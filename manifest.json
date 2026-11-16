@@ -1,27 +1,29 @@
+
 {
-  "background_color": "#050816",
-  "dir": "ltr",
-  "display": "standalone",
+  "id": "/BilliardX-3D-/",
   "name": "BilliardX 3D",
-  "orientation": "any",
-  "scope": "/",
   "short_name": "BilliardX",
-  "start_url": "/",
+  "description": "Enjoy a creative 3D billiards game with realistic gameplay and neon graphics.",
+  "lang": "en",
+  "dir": "ltr",
+  "start_url": "/BilliardX-3D/",
+  "scope": "/BilliardX-3D/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#050816",
   "theme_color": "#050816",
-  "id": "billiardx",
-  "description": "Enjoy a creative 3D billiards game with realistic gameplay and neon graphics."
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
 }
-"icons": [
-  {
-    "src": "icon-192.png",
-    "sizes": "192x192",
-    "type": "image/png",
-    "purpose": "any"
-  },
-  {
-    "src": "icon-512.png",
-    "sizes": "512x512",
-    "type": "image/png",
-    "purpose": "any"
-  }
-]
