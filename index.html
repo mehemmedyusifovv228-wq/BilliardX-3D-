@@ -1,0 +1,474 @@
+
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Neon Billiards 3D</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#050914;color:white;font-family:Arial;overflow:hidden;touch-action:none}
+header{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;background:#0b1728;border-bottom:1px solid #1d5262}
+.logo{font-size:17px;font-weight:900;color:#42ffe0;text-shadow:0 0 12px #00eac5}
+.sub{font-size:9px;color:#91aebe;margin-top:4px}
+.hud{height:50px;display:flex;justify-content:space-around;align-items:center;background:#0b1524}
+.stat{text-align:center;color:#9bb1c2;font-size:10px}
+.stat b{display:block;color:#4bffe0;font-size:17px;margin-top:3px}
+#game{height:calc(100dvh - 195px);width:100%;touch-action:none}
+#message{position:absolute;top:115px;width:100%;text-align:center;color:#54f9df;font-size:12px;pointer-events:none;text-shadow:0 0 8px #00eac5}
+.controls{position:absolute;bottom:0;width:100%;min-height:87px;padding:9px;background:#0b1524;border-top:1px solid #205060;display:flex;align-items:center;justify-content:space-around;gap:6px;flex-wrap:wrap}
+.power{font-size:10px;color:#a7c1d0}
+input{width:75px;accent-color:#37ffdc}
+button{padding:11px 12px;border:1px solid #35dcca;border-radius:9px;background:#102c38;color:#4bffe0;font-size:11px;font-weight:bold}
+button.main{background:linear-gradient(130deg,#00d8a4,#009edb);color:#06151c;border:0}
+button:active{transform:scale(.95)}
+@media(max-width:370px){.logo{font-size:14px}button{padding:9px 8px}input{width:60px}}
+</style>
+</head>
+<body>
+
+<header>
+ <div>
+  <div class="logo">✦ NEON BILLIARDS</div>
+  <div class="sub">ULTRA 3D EDITION</div>
+ </div>
+ <button id="sound">🔊 SƏS</button>
+</header>
+
+<div class="hud">
+ <div class="stat">XAL<b id="score">0</b></div>
+ <div class="stat">ZƏRBƏ<b id="shots">0</b></div>
+ <div class="stat">TOPLAR<b id="remaining">15</b></div>
+ <div class="stat">STATUS<b id="status">READY</b></div>
+</div>
+
+<div id="message">Ekrana toxunaraq istiqaməti seç, sonra zərbə vur!</div>
+<div id="game"></div>
+
+<div class="controls">
+ <div class="power">GÜC<br>
+  <input id="power" type="range" min="10" max="100" value="65">
+  <span id="powerText">65%</span>
+ </div>
+ <button id="left">↶</button>
+ <button class="main" id="shoot">⚡ ZƏRBƏ</button>
+ <button id="right">↷</button>
+ <button id="pause">Ⅱ</button>
+ <button id="restart">↻</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+(()=>{
+"use strict";
+const $=id=>document.getElementById(id);
+const game=$("game");
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x050914);
+
+const camera=new THREE.PerspectiveCamera(43,game.clientWidth/game.clientHeight,.1,100);
+camera.position.set(0,11,13);
+camera.lookAt(0,0,0);
+
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(game.clientWidth,game.clientHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true;
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.15;
+game.appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0x9acfff,0x12172b,1.5));
+const light=new THREE.DirectionalLight(0xffffff,2.5);
+light.position.set(-4,9,5);
+light.castShadow=true;
+scene.add(light);
+
+const glow=new THREE.PointLight(0x00ffe1,35,14);
+glow.position.set(0,4,0);
+scene.add(glow);
+
+const purple=new THREE.PointLight(0x813cff,25,12);
+purple.position.set(4,3,-3);
+scene.add(purple);
+
+function mat(color,roughness=.3,metalness=.1){
+ return new THREE.MeshStandardMaterial({color,roughness,metalness});
+}
+
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(100,100),mat(0x080e1c,.9));
+floor.rotation.x=-Math.PI/2;
+floor.position.y=-.6;
+scene.add(floor);
+
+const table=new THREE.Mesh(new THREE.BoxGeometry(10.3,.4,5.7),mat(0x075c48,.35));
+table.receiveShadow=true;
+scene.add(table);
+
+function box(w,h,d,x,y,z,m){
+ const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);
+ o.position.set(x,y,z);
+ o.castShadow=true;
+ o.receiveShadow=true;
+ scene.add(o);
+ return o;
+}
+
+const frame=mat(0x142b43,.2,.7);
+box(10.5,.5,.3,0,.35,-2.9,frame);
+box(10.5,.5,.3,0,.35,2.9,frame);
+box(.3,.5,5.7,-5.15,.35,0,frame);
+box(.3,.5,5.7,5.15,.35,0,frame);
+
+function neon(w,h,d,x,y,z,color=0x00ffe1){
+ const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshBasicMaterial({color}));
+ o.position.set(x,y,z);
+ scene.add(o);
+}
+neon(10,.04,.04,0,.61,-2.85);
+neon(10,.04,.04,0,.61,2.85);
+neon(.04,.04,5.5,-5.12,.61,0,0x258dff);
+neon(.04,.04,5.5,5.12,.61,0,0x258dff);
+
+const pocketPositions=[[-4.85,-2.55],[0,-2.55],[4.85,-2.55],[-4.85,2.55],[0,2.55],[4.85,2.55]];
+const pockets=[];
+
+pocketPositions.forEach(([x,z])=>{
+ const hole=new THREE.Mesh(new THREE.CylinderGeometry(.3,.3,.08,32),mat(0x010207,.9));
+ hole.position.set(x,.24,z);
+ scene.add(hole);
+ const ring=new THREE.Mesh(new THREE.TorusGeometry(.31,.025,8,40),new THREE.MeshBasicMaterial({color:0x19ffe0}));
+ ring.rotation.x=Math.PI/2;
+ ring.position.set(x,.3,z);
+ scene.add(ring);
+ pockets.push({x,z});
+});
+
+const balls=[];
+const radius=.16;
+const ballGeo=new THREE.SphereGeometry(radius,32,32);
+const colors=[0xffffff,0xffff00,0x2155ff,0xff253e,0x9c35e8,0xff8a18,0x1ac46c,0x181818,0xffff00,0x2155ff,0xff253e,0x9c35e8,0xff8a18,0x1ac46c,0x181818];
+
+function createBall(x,z,color,num){
+ const mesh=new THREE.Mesh(ballGeo,new THREE.MeshPhysicalMaterial({
+  color,roughness:.11,metalness:.06,clearcoat:1,clearcoatRoughness:.04
+ }));
+ mesh.position.set(x,.42,z);
+ mesh.castShadow=true;
+ scene.add(mesh);
+
+ if(num>=9){
+  const stripe=new THREE.Mesh(new THREE.TorusGeometry(radius*.92,.024,8,40),mat(color,.2));
+  stripe.rotation.x=Math.PI/2;
+  mesh.add(stripe);
+ }
+
+ if(num>0){
+  const disc=new THREE.Mesh(new THREE.CircleGeometry(.062,24),new THREE.MeshBasicMaterial({color:0xffffff}));
+  disc.position.set(0,0,radius+.002);
+  mesh.add(disc);
+
+  const canvas=document.createElement("canvas");
+  canvas.width=128;canvas.height=128;
+  const ctx=canvas.getContext("2d");
+  ctx.fillStyle="#111";
+  ctx.font="bold 78px Arial";
+  ctx.textAlign="center";
+  ctx.textBaseline="middle";
+  ctx.fillText(num,64,66);
+
+  const texture=new THREE.CanvasTexture(canvas);
+  const label=new THREE.Mesh(new THREE.PlaneGeometry(.09,.09),new THREE.MeshBasicMaterial({map:texture,transparent:true,side:THREE.DoubleSide}));
+  label.position.set(0,0,radius+.012);
+  mesh.add(label);
+ }
+
+ balls.push({mesh,x,z,vx:0,vz:0,active:true,num});
+}
+
+function setup(){
+ balls.forEach(b=>scene.remove(b.mesh));
+ balls.length=0;
+ createBall(-2.7,0,0xffffff,0);
+
+ const positions=[
+ [1,0],[1.35,-.185],[1.35,.185],
+ [1.7,-.37],[1.7,0],[1.7,.37],
+ [2.05,-.555],[2.05,-.185],[2.05,.185],[2.05,.555],
+ [2.4,-.74],[2.4,-.37],[2.4,0],[2.4,.37],[2.4,.74]
+ ];
+
+ positions.forEach((p,i)=>createBall(p[0],p[1],colors[i],i+1));
+}
+
+let angle=0,score=0,shots=0,moving=false,paused=false,soundOn=true;
+let cueScratch=false;
+
+const aimGeometry=new THREE.BufferGeometry();
+const aimLine=new THREE.Line(aimGeometry,new THREE.LineDashedMaterial({color:0x5bffdc,dashSize:.12,gapSize:.07}));
+scene.add(aimLine);
+
+const cueGroup=new THREE.Group();
+scene.add(cueGroup);
+const cueStick=new THREE.Mesh(new THREE.CylinderGeometry(.018,.03,2.5,12),mat(0xe1a45d,.25));
+cueGroup.add(cueStick);
+
+function updateAim(){
+ const cue=balls[0];
+ if(!cue||!cue.active)return;
+ aimGeometry.setFromPoints([
+  new THREE.Vector3(cue.x,.43,cue.z),
+  new THREE.Vector3(cue.x+Math.cos(angle)*3,.43,cue.z+Math.sin(angle)*3)
+ ]);
+ aimLine.computeLineDistances();
+ aimLine.visible=!moving;
+ cueGroup.visible=!moving;
+ cueGroup.position.set(cue.x,.43,cue.z);
+ cueGroup.rotation.y=-angle;
+ cueStick.position.set(-1.5,0,0);
+}
+
+function updateHUD(){
+ $("score").textContent=score;
+ $("shots").textContent=shots;
+ $("remaining").textContent=balls.filter(b=>b.active&&b.num!==0).length;
+ $("status").textContent=paused?"PAUSE":moving?"PLAY":"READY";
+}
+
+function setMessage(t){$("message").textContent=t;}
+
+function beep(freq=500,duration=.08){
+ if(!soundOn)return;
+ try{
+  const AC=window.AudioContext||window.webkitAudioContext;
+  const ac=new AC();
+  const osc=ac.createOscillator();
+  const gain=ac.createGain();
+  osc.frequency.value=freq;
+  osc.connect(gain);
+  gain.connect(ac.destination);
+  gain.gain.setValueAtTime(.05,ac.currentTime);
+  gain.gain.exponentialRampToValueAtTime(.001,ac.currentTime+duration);
+  osc.start();
+  osc.stop(ac.currentTime+duration);
+  osc.onended=()=>ac.close();
+ }catch(e){}
+}
+
+function shoot(){
+ if(moving||paused)return;
+ const cue=balls[0];
+ if(!cue||!cue.active)return;
+ const power=Number($("power").value)/100;
+ const speed=.055+power*.12;
+ cue.vx=Math.cos(angle)*speed;
+ cue.vz=Math.sin(angle)*speed;
+ moving=true;
+ shots++;
+ setMessage("ZƏRBƏ!");
+ beep(260,.12);
+ updateHUD();
+}
+
+$("shoot").onclick=shoot;
+$("left").onclick=()=>{if(!moving){angle-=.12;updateAim()}};
+$("right").onclick=()=>{if(!moving){angle+=.12;updateAim()}};
+$("power").oninput=()=>{$("powerText").textContent=$("power").value+"%"};
+
+$("pause").onclick=()=>{
+ paused=!paused;
+ $("pause").textContent=paused?"▶":"Ⅱ";
+ setMessage(paused?"Oyun dayandırıldı":"Oyun davam edir");
+ updateHUD();
+};
+
+$("restart").onclick=()=>{
+ score=0;shots=0;moving=false;paused=false;cueScratch=false;
+ angle=0;
+ setup();
+ setMessage("Yeni oyun başladı! İstiqaməti seç.");
+ updateAim();updateHUD();
+};
+
+$("sound").onclick=()=>{
+ soundOn=!soundOn;
+ $("sound").textContent=soundOn?"🔊 SƏS":"🔇 SƏS";
+};
+
+const raycaster=new THREE.Raycaster();
+const pointer=new THREE.Vector2();
+const plane=new THREE.Plane(new THREE.Vector3(0,1,0),-.42);
+
+function worldPosition(e){
+ const r=renderer.domElement.getBoundingClientRect();
+ pointer.x=((e.clientX-r.left)/r.width)*2-1;
+ pointer.y=-((e.clientY-r.top)/r.height)*2+1;
+ raycaster.setFromCamera(pointer,camera);
+ const p=new THREE.Vector3();
+ raycaster.ray.intersectPlane(plane,p);
+ return p;
+}
+
+function setAim(e){
+ const cue=balls[0];
+ if(!cue||!cue.active||moving||paused)return;
+ const p=worldPosition(e);
+ const dx=cue.x-p.x;
+ const dz=cue.z-p.z;
+ if(Math.hypot(dx,dz)>.15){
+  angle=Math.atan2(dz,dx);
+  updateAim();
+ }
+}
+
+renderer.domElement.addEventListener("pointerdown",e=>{
+ dragging=true;
+ setAim(e);
+});
+renderer.domElement.addEventListener("pointermove",e=>{
+ if(dragging)setAim(e);
+});
+window.addEventListener("pointerup",()=>dragging=false);
+
+function pocketBall(b){
+ b.active=false;
+ b.mesh.visible=false;
+ b.vx=0;b.vz=0;
+ if(b.num===0){
+  cueScratch=true;
+  score=Math.max(0,score-5);
+  setMessage("Ağ top cibə düşdü! Yenidən yerləşdirilir.");
+ }else{
+  score+=10;
+  beep(750,.13);
+  setMessage("Əla! +10 xal");
+ }
+ updateHUD();
+}
+
+function physics(){
+ if(!moving||paused)return;
+
+ let still=true;
+
+ for(const b of balls){
+  if(!b.active)continue;
+
+  b.x+=b.vx;
+  b.z+=b.vz;
+
+  b.vx*=.986;
+  b.vz*=.986;
+
+  if(Math.abs(b.vx)+Math.abs(b.vz)>.001)still=false;
+
+  // POCKET DETECTION
+  for(const p of pockets){
+   if(Math.hypot(b.x-p.x,b.z-p.z)<.29){
+    pocketBall(b);
+    break;
+   }
+  }
+  if(!b.active)continue;
+
+  // TABLE CUSHIONS
+  const minX=-4.9,maxX=4.9,minZ=-2.65,maxZ=2.65;
+  if(b.x<minX+radius){b.x=minX+radius;b.vx=Math.abs(b.vx)*.82;beep(180,.04)}
+  if(b.x>maxX-radius){b.x=maxX-radius;b.vx=-Math.abs(b.vx)*.82;beep(180,.04)}
+  if(b.z<minZ+radius){b.z=minZ+radius;b.vz=Math.abs(b.vz)*.82;beep(180,.04)}
+  if(b.z>maxZ-radius){b.z=maxZ-radius;b.vz=-Math.abs(b.vz)*.82;beep(180,.04)}
+
+  b.mesh.position.set(b.x,.42,b.z);
+  b.mesh.rotation.x+=b.vz*1.5;
+  b.mesh.rotation.z-=b.vx*1.5;
+ }
+
+ // BALL COLLISIONS
+ for(let i=0;i<balls.length;i++){
+  const a=balls[i];
+  if(!a.active)continue;
+  for(let j=i+1;j<balls.length;j++){
+   const b=balls[j];
+   if(!b.active)continue;
+
+   let dx=b.x-a.x,dz=b.z-a.z;
+   let dist=Math.hypot(dx,dz);
+   const minDist=radius*2;
+
+   if(dist<minDist){
+    if(dist<.0001){dx=.001;dz=0;dist=.001}
+    const nx=dx/dist,nz=dz/dist;
+    const overlap=minDist-dist;
+    a.x-=nx*overlap/2;
+    a.z-=nz*overlap/2;
+    b.x+=nx*overlap/2;
+    b.z+=nz*overlap/2;
+
+    const relative=(b.vx-a.vx)*nx+(b.vz-a.vz)*nz;
+    if(relative<0){
+     const impulse=-(1.86)*relative/2;
+     a.vx-=impulse*nx;
+     a.vz-=impulse*nz;
+     b.vx+=impulse*nx;
+     b.vz+=impulse*nz;
+     beep(320,.05);
+    }
+   }
+  }
+ }
+
+ for(const b of balls){
+  if(!b.active)continue;
+  b.mesh.position.set(b.x,.42,b.z);
+  if(Math.abs(b.vx)+Math.abs(b.vz)>.001)still=false;
+ }
+
+ if(still){
+  balls.forEach(b=>{b.vx=0;b.vz=0});
+  moving=false;
+
+  if(cueScratch){
+   const cue=balls[0];
+   cue.active=true;
+   cue.mesh.visible=true;
+   cue.x=-2.7;cue.z=0;
+   cue.mesh.position.set(cue.x,.42,cue.z);
+   cueScratch=false;
+   setMessage("Ağ top yenidən oyuna qaytarıldı.");
+  }else if(balls.filter(b=>b.active&&b.num!==0).length===0){
+   setMessage("🏆 QƏLƏBƏ! Bütün toplar cibdədir!");
+  }else{
+   setMessage("Növbəti zərbəyə hazırsan!");
+  }
+  updateAim();
+  updateHUD();
+ }
+}
+
+function animate(){
+ requestAnimationFrame(animate);
+ physics();
+ if(!moving)updateAim();
+ renderer.render(scene,camera);
+}
+
+function resize(){
+ const w=game.clientWidth,h=game.clientHeight;
+ camera.aspect=w/h;
+ camera.updateProjectionMatrix();
+ renderer.setSize(w,h);
+}
+window.addEventListener("resize",resize);
+
+setup();
+updateAim();
+updateHUD();
+animate();
+
+})();
+</script>
+</body>
+</html>
+
